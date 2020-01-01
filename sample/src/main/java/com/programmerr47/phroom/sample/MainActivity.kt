@@ -8,7 +8,7 @@ import kotlinx.coroutines.*
 
 class MainActivity : AppCompatActivity() {
     private val locator = Locator() //todo make a global locator
-    private val userAdapter = UserAdapter()
+    private val userAdapter = UserAdapter(locator.phroom)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
