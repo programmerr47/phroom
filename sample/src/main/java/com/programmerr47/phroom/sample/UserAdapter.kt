@@ -1,30 +1,19 @@
 package com.programmerr47.phroom.sample
 
-import android.graphics.drawable.Drawable
-import android.os.Handler
-import android.os.Looper
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
-import java.io.InputStream
-import java.net.URL
-import java.util.concurrent.Executors
+import com.programmerr47.phroom.Phroom
 import kotlin.math.min
 
-class UserAdapter : RecyclerView.Adapter<UserAdapter.ViewHolder>() {
-    private val executor = Executors.newFixedThreadPool(5)
-    private val uiHandler = Handler(Looper.getMainLooper())
-
+class UserAdapter(
+    private val phroom: Phroom
+) : RecyclerView.Adapter<UserAdapter.ViewHolder>() {
     private var list: List<String> = emptyList()
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) = ViewHolder(SquareImageView(parent.context))
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) = with(holder) {
-        //TODO replace that with more nice approach
-        executor.execute {
-            val stream = URL(list[position]).content as InputStream
-            val drawable = Drawable.createFromStream(stream, null)
-            uiHandler.post { ivPhoto.setImageDrawable(drawable) }
-        }
+        phroom.load(list[position], ivPhoto)
     }
 
     override fun getItemCount() = list.size
