@@ -22,9 +22,9 @@ class Phroom {
         val removed = submitted.remove(url)
 
         if (removed != null) {
-            Log.v("FUCK", "remove submitted for $url")
+            Log.d("Phroom", "remove submitted for $url")
         }
-        Log.v("FUCK", "started new task for $url")
+        Log.d("Phroom", "started new task for $url")
 
         val newTask = Task(url).also { it.target = target }
         target.setImageDrawable(null) //TODO add progress drawable
@@ -34,7 +34,7 @@ class Phroom {
             val drawable = Drawable.createFromStream(stream, null)
             uiHandler.post {
                 newTask.target?.let {
-                    Log.v("FUCK", "setImageDrawable for $url")
+                    Log.d("Phroom", "setImageDrawable for $url")
                     it.setImageDrawable(drawable)
                 }
             }
@@ -59,7 +59,7 @@ private class Task(
     override fun onViewDetachedFromWindow(v: View) {
         synchronized(this) {
             if (v == target) {
-                Log.v("FUCK", "destruct view for $url")
+                Log.d("Phroom", "destruct view for $url")
                 target = null
             }
         }
