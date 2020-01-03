@@ -1,6 +1,7 @@
 package com.programmerr47.phroom
 
 import android.graphics.drawable.Drawable
+import android.util.Log
 import android.widget.ImageView
 import java.io.InputStream
 import java.lang.ref.WeakReference
@@ -17,11 +18,11 @@ class Phroom {
 
     private val submitted = WeakHashMap<ImageView, UrlTask>()
 
-    fun load(url: String, target: ImageView) {
+    fun load(url: String, target: ImageView, config: TaskConfigBuilder.() -> Unit = {}) {
         cancelWork(target)
         target.setImageDrawable(null)  //TODO add progress drawable
 
-        val task = UrlTask(url, target)
+        val task = UrlTask(url, TaskConfigBuilder(target.context).apply(config), target)
         submitted[target] = task
         task.start(executor, cbExecutor)
     }
@@ -33,6 +34,7 @@ class Phroom {
 
 private class UrlTask(
         private val url: String,
+        private val config: TaskConfig,
         target: ImageView
 ) {
     val weakTarget = WeakReference(target)
@@ -40,12 +42,13 @@ private class UrlTask(
 
     fun start(executor: ExecutorService, callbackEx: Executor) {
         inner?.cancel(true)
+        weakTarget.get()?.setImageDrawable(config.loadingPlaceholder)
         inner = executor.submit {
-            val stream = URL(url).content as InputStream
-            val drawable = Drawable.createFromStream(stream, null)
+            val drawable = runCatching { Drawable.createFromStream(URL(url).content as InputStream, null) }.getOrNull()
 
             callbackEx.execute {
-                weakTarget.get()?.setImageDrawable(drawable)
+                Log.v("FUCK", "${url}: $drawable, ${config.errorPlaceholder}")
+                weakTarget.get()?.setImageDrawable(drawable ?: config.errorPlaceholder)
             }
         }
     }

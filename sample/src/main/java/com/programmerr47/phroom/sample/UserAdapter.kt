@@ -1,6 +1,8 @@
 package com.programmerr47.phroom.sample
 
 import android.view.ViewGroup
+import android.widget.ImageView
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.programmerr47.phroom.Phroom
 import kotlin.math.min
@@ -10,10 +12,15 @@ class UserAdapter(
 ) : RecyclerView.Adapter<UserAdapter.ViewHolder>() {
     private var list: List<String> = emptyList()
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) = ViewHolder(SquareImageView(parent.context))
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) = ViewHolder(SquareImageView(parent.context).apply {
+        scaleType = ImageView.ScaleType.CENTER_CROP
+    })
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) = with(holder) {
-        phroom.load(list[position], ivPhoto)
+        phroom.load(list[position], ivPhoto) {
+            loadingPlaceholderRes = R.drawable.ic_image
+            errorPlaceholder = CenterInsideDrawable(ContextCompat.getDrawable(ivPhoto.context, R.drawable.ic_image_no)!!)
+        }
     }
 
     override fun getItemCount() = list.size
