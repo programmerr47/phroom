@@ -1,69 +1,57 @@
 package com.programmerr47.phroom
 
 import android.graphics.drawable.Drawable
-import android.os.Handler
-import android.os.Looper
-import android.util.Log
-import android.view.View
 import android.widget.ImageView
 import java.io.InputStream
+import java.lang.ref.WeakReference
 import java.net.URL
+import java.util.*
+import java.util.concurrent.Executor
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 
 class Phroom {
     private val executor = Executors.newFixedThreadPool(5)
-    private val uiHandler = Handler(Looper.getMainLooper())
+    private val cbExecutor = MainThreadExecutor()
 
-    private val submitted = HashMap<String, Future<*>>()
+    private val submitted = WeakHashMap<ImageView, UrlTask>()
 
     fun load(url: String, target: ImageView) {
-        submitted[url]?.cancel(true)
-        val removed = submitted.remove(url)
+        cancelWork(target)
+        target.setImageDrawable(null)  //TODO add progress drawable
 
-        if (removed != null) {
-            Log.d("Phroom", "remove submitted for $url")
-        }
-        Log.d("Phroom", "started new task for $url")
+        val task = UrlTask(url, target)
+        submitted[target] = task
+        task.start(executor, cbExecutor)
+    }
 
-        val newTask = Task(url).also { it.target = target }
-        target.setImageDrawable(null) //TODO add progress drawable
-
-        val new = executor.submit {
-            val stream = URL(url).content as InputStream
-            val drawable = Drawable.createFromStream(stream, null)
-            uiHandler.post {
-                newTask.target?.let {
-                    Log.d("Phroom", "setImageDrawable for $url")
-                    it.setImageDrawable(drawable)
-                }
-            }
-        }
-        submitted[url] = new
+    private fun cancelWork(target: ImageView) {
+        submitted.remove(target)?.end()
     }
 }
 
-private class Task(
-    val url: String
-) : View.OnAttachStateChangeListener {
+private class UrlTask(
+        private val url: String,
+        target: ImageView
+) {
+    val weakTarget = WeakReference(target)
+    var inner: Future<*>? = null
 
-    @Volatile
-    var target: ImageView? = null
-        @Synchronized
-        set(value) {
-            field?.removeOnAttachStateChangeListener(this)
-            field = value
-            value?.addOnAttachStateChangeListener(this)
-        }
+    fun start(executor: ExecutorService, callbackEx: Executor) {
+        inner?.cancel(true)
+        inner = executor.submit {
+            val stream = URL(url).content as InputStream
+            val drawable = Drawable.createFromStream(stream, null)
 
-    override fun onViewDetachedFromWindow(v: View) {
-        synchronized(this) {
-            if (v == target) {
-                Log.d("Phroom", "destruct view for $url")
-                target = null
+            callbackEx.execute {
+                weakTarget.get()?.setImageDrawable(drawable)
             }
         }
     }
 
-    override fun onViewAttachedToWindow(v: View) {}
+    fun end() {
+        weakTarget.clear()
+        inner?.cancel(true)
+    }
 }
