@@ -18,8 +18,8 @@ class UserAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) = with(holder) {
         phroom.load(list[position], ivPhoto) {
-            loadingPlaceholderRes = R.drawable.ic_image
-            errorPlaceholder = CenterInsideDrawable(ContextCompat.getDrawable(ivPhoto.context, R.drawable.ic_image_no)!!)
+            loadingPlaceholderRes = R.drawable.bg_image
+            errorPlaceholderRes = R.drawable.bg_image_no
         }
     }
 
