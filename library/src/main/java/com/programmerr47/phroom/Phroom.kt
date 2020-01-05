@@ -3,14 +3,15 @@ package com.programmerr47.phroom
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.util.Log
 import android.widget.ImageView
+import com.programmerr47.phroom.targets.LogTarget
+import com.programmerr47.phroom.targets.MainThreadTarget
+import com.programmerr47.phroom.targets.Target
+import com.programmerr47.phroom.targets.ViewTarget
 import java.io.File
 import java.io.InputStream
-import java.lang.ref.WeakReference
 import java.net.URL
 import java.util.*
-import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
@@ -22,13 +23,15 @@ class Phroom {
 
     private val submitted = WeakHashMap<ImageView, UrlTask>()
 
-    fun load(url: String, target: ImageView, config: TaskConfigBuilder.() -> Unit = {}) {
-        checkDiskCache(target.context)
-        cancelWork(target)
+    fun load(url: String, targetView: ImageView, config: TaskConfigBuilder.() -> Unit = {}) {
+        checkDiskCache(targetView.context)
+        cancelWork(targetView)
 
-        val task = UrlTask(url, TaskConfigBuilder(target.context).apply(config), diskCache, target)
-        submitted[target] = task
-        task.start(executor, cbExecutor)
+        val config = TaskConfigBuilder(targetView.context).apply(config)
+        val target = MainThreadTarget(ViewTarget(targetView, config), cbExecutor)
+        val task = UrlTask(url, diskCache, target)
+        submitted[targetView] = task
+        task.start(executor)
     }
 
     private fun cancelWork(target: ImageView) {
@@ -52,44 +55,36 @@ class Phroom {
 
         private val DUMMY_CACHE = object : BitmapCache {
             override fun get(key: String): Bitmap? = null
-            override fun put(key: String, bitmap: Bitmap) {}
+            override fun put(key: String, bitmap: Bitmap) = Unit
         }
     }
 }
 
 private class UrlTask(
         private val url: String,
-        private val config: TaskConfig,
         private val diskCache: BitmapCache,
-        target: ImageView
+        target: Target
 ) {
-    val weakTarget = WeakReference(target)
+    var target: Target? = LogTarget(target)
     var inner: Future<*>? = null
 
-    fun start(executor: ExecutorService, callbackEx: Executor) {
+    fun start(executor: ExecutorService) {
         inner?.cancel(true)
-        weakTarget.get()?.setImageDrawable(config.loadingPlaceholder)
+        target?.onNew()
         inner = executor.submit {
-            val start = System.nanoTime()
-            val bitmap = runCatching {
+            target?.onStart()
+            runCatching {
                 diskCache.get(url) ?: BitmapFactory.decodeStream(URL(url).content as InputStream).also {
                     diskCache.put(url, it)
                 }
-            }.getOrNull()
-
-            Log.d("Phroom", "$url was loading for ${(System.nanoTime() - start) / 1_000_000} ms")
-
-            callbackEx.execute {
-                weakTarget.get()?.let {
-                    if (bitmap != null) it.setImageBitmap(bitmap)
-                    else it.setImageDrawable(config.errorPlaceholder)
-                }
             }
+                .onSuccess { target?.onSuccess(it) }
+                .onFailure { target?.onFailure(it) }
         }
     }
 
     fun end() {
-        weakTarget.clear()
+        target = null
         inner?.cancel(true)
     }
 }
