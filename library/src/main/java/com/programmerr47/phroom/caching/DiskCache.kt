@@ -1,8 +1,7 @@
-package com.programmerr47.phroom
+package com.programmerr47.phroom.caching
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.util.Log
 import java.io.File
 import java.io.FileInputStream
 import java.security.MessageDigest

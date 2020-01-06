@@ -4,8 +4,8 @@ import android.graphics.Bitmap
 import com.programmerr47.phroom.logInternal
 
 internal class LogTarget(private val origin: Target) : Target {
-    private var initialNs = 0L
-    private var startNs = 0L
+    private var initialNs = System.nanoTime()
+    private var startNs = System.nanoTime()
 
     override fun onNew() {
         initialNs = System.nanoTime()

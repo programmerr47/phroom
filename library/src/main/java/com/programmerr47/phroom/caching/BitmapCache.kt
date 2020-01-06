@@ -1,4 +1,4 @@
-package com.programmerr47.phroom
+package com.programmerr47.phroom.caching
 
 import android.graphics.Bitmap
 
