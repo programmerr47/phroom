@@ -1,15 +1,16 @@
 package com.programmerr47.phroom.targets
 
 import android.graphics.Bitmap
+import android.graphics.drawable.Drawable
 import com.programmerr47.phroom.logInternal
 
-internal class LogTarget(private val origin: Target) : Target {
+internal class LogTarget(private val origin: Target) : Target by origin {
     private var initialNs = System.nanoTime()
     private var startNs = System.nanoTime()
 
-    override fun onNew() {
+    override fun onNew(drawable: Drawable?) {
         initialNs = System.nanoTime()
-        origin.onNew()
+        origin.onNew(drawable)
     }
 
     override fun onStart() {
