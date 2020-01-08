@@ -2,7 +2,6 @@ package com.programmerr47.phroom.caching
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.util.Log
 import java.io.File
 import java.io.FileInputStream
 import java.security.MessageDigest
@@ -25,7 +24,6 @@ internal class DiskCache(
     }
 
     override fun put(key: String, bitmap: Bitmap): Unit = _lock.write {
-        Log.v("FUCK", "Put in disk bitmap: ${bitmap.width}, ${bitmap.height}")
         tryToRemove(key)
 
         val bitmapFile = File(cacheDir, key.md5())
