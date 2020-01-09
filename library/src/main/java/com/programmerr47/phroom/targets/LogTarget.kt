@@ -8,9 +8,9 @@ internal class LogTarget(private val origin: Target) : Target by origin {
     private var initialNs = System.nanoTime()
     private var startNs = System.nanoTime()
 
-    override fun onNew(drawable: Drawable?) {
+    override fun onNew(initial: Bitmap?) {
         initialNs = System.nanoTime()
-        origin.onNew(drawable)
+        origin.onNew(initial)
     }
 
     override fun onStart() {

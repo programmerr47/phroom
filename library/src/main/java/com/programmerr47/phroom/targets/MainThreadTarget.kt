@@ -8,7 +8,7 @@ internal class MainThreadTarget(
     private val origin: Target,
     private val executor: Executor
 ) : Target by origin {
-    override fun onNew(initial: Drawable?) = executor.execute { origin.onNew(initial) }
+    override fun onNew(initial: Bitmap?) = executor.execute { origin.onNew(initial) }
 
     override fun onStart() = executor.execute { origin.onStart() }
 

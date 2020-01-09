@@ -4,13 +4,13 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
-import android.graphics.drawable.BitmapDrawable
 import android.widget.ImageView
 import androidx.annotation.WorkerThread
 import com.programmerr47.phroom.caching.BitmapCache
 import com.programmerr47.phroom.caching.DiskCache
 import com.programmerr47.phroom.caching.LruMemoryCache
 import com.programmerr47.phroom.caching.MemoryCache
+import com.programmerr47.phroom.caching.ThumbnailsCache
 import com.programmerr47.phroom.targets.LogTarget
 import com.programmerr47.phroom.targets.MainThreadTarget
 import com.programmerr47.phroom.targets.Target
@@ -24,12 +24,14 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import kotlin.math.min
+import kotlin.math.sqrt
 
 class Phroom {
     private val executor = Executors.newFixedThreadPool(5)
     private val cbExecutor = MainThreadExecutor()
     private var diskCache: BitmapCache = DUMMY_CACHE
     private var memoryCache: MemoryCache = DUMMY_MEM_CACHE
+    private var thumbCache: BitmapCache = DUMMY_CACHE
 
     private val submitted = WeakHashMap<ImageView, UrlTask>()
 
@@ -39,7 +41,7 @@ class Phroom {
 
         val config = TaskConfigBuilder(targetView.context).apply(config)
         val target = MainThreadTarget(ViewTarget(targetView, config), cbExecutor)
-        val task = UrlTask(url, diskCache, memoryCache, target)
+        val task = UrlTask(url, diskCache, memoryCache, thumbCache, target)
         submitted[targetView] = task
         task.start(executor)
     }
@@ -55,6 +57,13 @@ class Phroom {
 
         if (memoryCache == DUMMY_MEM_CACHE) {
             memoryCache = LruMemoryCache(calculateMemoryCacheSize(context))
+        }
+        
+        if (thumbCache == DUMMY_CACHE) {
+            //For now we will use same memory amount for thumbnails as for memory cache
+            //but we can add a global config, to regulate range [0, 1] of additional
+            //memory cache size multiplier for thumbnails
+            thumbCache = ThumbnailsCache(calculateMemoryCacheSize(context))
         }
     }
 
@@ -83,6 +92,7 @@ private class UrlTask(
     private val url: String,
     private val diskCache: BitmapCache,
     private val memoryCache: MemoryCache,
+    private val thumbCache: BitmapCache,
     target: Target
 ) {
     var target: Target? = LogTarget(target)
@@ -102,14 +112,14 @@ private class UrlTask(
             if (cached != null && !dirty) {
                 target.onSuccess(cached)
             } else if (cached != null && dirty) {
-                target.onNew(BitmapDrawable(cached))
+                target.onNew(cached)
                 inner = executor.enqueueJob(size)
             } else {
-                target.onNew(null)
+                target.onNew(thumbCache.get(url))
                 inner = executor.enqueueJob(size)
             }
         } else {
-            target.onNew(null)
+            target.onNew(thumbCache.get(url))
             inner = executor.enqueueJob(size)
         }
     }
@@ -136,14 +146,17 @@ private class UrlTask(
     @WorkerThread
     private fun fetchUrl(spec: BitmapSpec) {
         runCatching {
-            val originalBitmap = diskCache.get(spec.url) ?: BitmapFactory.decodeStream(BufferedInputStream(URL(spec.url).content as InputStream)).also {
+            diskCache.get(spec.url) ?: BitmapFactory.decodeStream(BufferedInputStream(URL(spec.url).content as InputStream)).also {
                 diskCache.put(spec.url, it)
             }
-
-            transform(originalBitmap, spec)
         }
-            .onSuccess { memoryCache.put(spec, it) }
-            .onSuccess { target?.onSuccess(it) }
+            .onSuccess {
+                val thumbnail = it.thumbnail()
+                val transformed = transform(it, spec)
+                memoryCache.put(spec, transformed)
+                thumbCache.put(spec.url, thumbnail)
+                target?.onSuccess(transformed)
+            }
             .onFailure { target?.onFailure(it) }
     }
 
@@ -152,8 +165,7 @@ private class UrlTask(
         val scaleFactor = scaleFactor(bitmap, spec)
         if (scaleFactor == 1f) return bitmap
 
-        val matrix = Matrix().apply { postScale(scaleFactor, scaleFactor) }
-        val transformed: Bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+        val transformed = bitmap.scaledCopy(scaleFactor)
         bitmap.recycle()
         return transformed
     }
@@ -166,6 +178,80 @@ private class UrlTask(
             spec.tWidth.toFloat() / bitmap.width,
             spec.tHeight.toFloat() / bitmap.height
         )
+    }
+
+    @WorkerThread
+    private fun Bitmap.thumbnail(): Bitmap {
+        //target area is 40 pixels which equals to 6x6 bitmap or 5x8 etc
+        val scaleFactor = sqrt(height.toFloat() * 40 / width) / height
+        return scaledCopy(scaleFactor).apply { blur() }
+    }
+
+    @WorkerThread
+    private fun Bitmap.scaledCopy(scaleFactor: Float): Bitmap {
+        val matrix = Matrix().apply { postScale(scaleFactor, scaleFactor) }
+        return Bitmap.createBitmap(this, 0, 0, width, height, matrix, true)
+    }
+
+    @WorkerThread
+    private fun Bitmap.blur() {
+        val pix = IntArray(width * height)
+        val newPix = IntArray(width * height)
+        getPixels(pix, 0, width, 0, 0, width, height)
+
+        val rgb = IntArray(3)
+        var rgbSum = IntArray(3)
+        val radius = 1 //let's say 1, but explicitly define variable for easy adjusting that
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                rgbSum.fill(0)
+                calculateSum(pix, x, y, radius, rgb, rgbSum)
+
+                val pixel = pix[y * width + x]
+                //first part is alpha channel, we want to preserve it
+                newPix[y * width + x] = (0xff000000.toInt() and pixel) or (rgbSum[0] shl 16) or (rgbSum[1] shl 8) or rgbSum[2]
+            }
+        }
+        setPixels(newPix, 0, width, 0, 0, width, height)
+    }
+
+    //This is place we can optimize for sure. Because some part of sums we recalculate all over
+    //again. I've maid naive algorithm, just to see results first
+    //TODO optimize blur calculation
+    //TODO also think about little bit change algorithm for blur on edges
+    private fun Bitmap.calculateSum(pix: IntArray, x: Int, y: Int, radius: Int, rgb: IntArray, rgbSum: IntArray) {
+        var count = 0
+        for (blurY in y - radius..y + radius) {
+            for (blurX in x - radius..x + radius) {
+                if (blurX in 0 until width && blurY in 0 until height) {
+                    val pixel = pix[blurY * width + blurX]
+                    pixel.spreadOutColor(rgb)
+                    rgbSum.sumEach(rgb)
+                    count++
+                }
+            }
+        }
+
+        rgbSum.divEach(count)
+    }
+
+    private fun IntArray.sumEach(other: IntArray) {
+        require(size == other.size)
+        for (i in 0 until size) {
+            this[i] += other[i]
+        }
+    }
+
+    private fun IntArray.divEach(count: Int) {
+        for (i in 0 until size) {
+            this[i] /= count
+        }
+    }
+
+    private fun Int.spreadOutColor(rgb: IntArray) {
+        rgb[0] = (this and 0xff0000) shr 16
+        rgb[1] = (this and 0x00ff00) shr 8
+        rgb[2] = (this and 0x0000ff)
     }
 
     fun end() {
