@@ -7,7 +7,7 @@ import android.graphics.drawable.Drawable
 internal interface Target {
     val size: Size
 
-    fun onNew(initial: Drawable?)
+    fun onNew(initial: Bitmap?)
     fun onStart()
     fun onSuccess(bitmap: Bitmap)
     fun onFailure(e: Throwable)

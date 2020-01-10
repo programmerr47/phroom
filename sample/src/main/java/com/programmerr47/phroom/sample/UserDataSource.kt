@@ -22,6 +22,7 @@ class UserDataSource(
 
     private fun load(size: Int, onResult: (List<String>) -> Unit) {
         GlobalScope.launch(Dispatchers.Main) {
+            //TODO handle not internet related exceptions
             val users = withContext(Dispatchers.IO) { api.getUsers(size) }
             onResult(users.results.map {
                 //DON'T use that in production code. I've added small probation of not valid url,

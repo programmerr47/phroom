@@ -15,7 +15,9 @@ internal class ViewTarget(
 ) : Target {
     override val size: Target.Size = ViewSize(imageView)
 
-    override fun onNew(initial: Drawable?) = imageView.setImageDrawable(initial ?: configBuilder.loadingPlaceholder)
+    override fun onNew(initial: Bitmap?) {
+        initial?.let { imageView.setImageBitmap(initial) } ?: imageView.setImageDrawable(configBuilder.loadingPlaceholder)
+    }
 
     override fun onStart() {}
 
