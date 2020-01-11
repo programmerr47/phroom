@@ -5,4 +5,6 @@
     <color name="colorAccent">#D81B60</color>
 
     <color name="textPrimary">#DE000000</color>
+
+    <color name="bgFrame">#55000000</color>
 </resources>

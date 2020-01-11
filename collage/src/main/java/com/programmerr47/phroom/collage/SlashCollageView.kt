@@ -6,47 +6,75 @@ import android.graphics.Paint
 import android.graphics.PointF
 import android.graphics.Rect
 import android.graphics.RectF
+import android.graphics.drawable.Drawable
 import android.util.AttributeSet
 import android.view.View
+import com.programmerr47.phroom.Phroom
 import kotlin.math.nextDown
+import kotlin.properties.Delegates.observable
 import kotlin.random.Random
 
 class SlashCollageView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
-    private val rnd = Random(System.currentTimeMillis())
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private var collage: List<RectF> = emptyList()
-    private var colors: List<Int> = emptyList()
+
+    private var originCollage: List<RectF> = emptyList()
+    private var finalCollage: List<RectF> = emptyList()
+
     private var urls: List<String> = emptyList()
+    private var collageDrawables: Array<Drawable?> = emptyArray()
+
+    lateinit var phroom: Phroom
+
+    var framePadding: Int by observable(0) { _, old, new ->
+        if (old != new) {
+            requestLayout()
+            invalidate()
+        }
+    }
+
+    var frameColor: Int by observable(0) { _, old, new ->
+        if (old != new) {
+            paint.color = new
+            invalidate()
+        }
+    }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val widthNotUnspecified = MeasureSpec.getMode(widthMeasureSpec) != MeasureSpec.UNSPECIFIED
         val heightNotUnspecified = MeasureSpec.getMode(heightMeasureSpec) != MeasureSpec.UNSPECIFIED
 
-        if (widthNotUnspecified && heightNotUnspecified && collage.isEmpty()) {
-            collage = generateCollage(
+        //TODO move that
+        if (widthNotUnspecified && heightNotUnspecified && originCollage.isEmpty()) {
+            originCollage = generateCollage(
                 MeasureSpec.getSize(widthMeasureSpec),
                 MeasureSpec.getSize(heightMeasureSpec)
             )
+        }
 
-            colors = collage.map { rnd.nextInt() }
+        finalCollage = originCollage.map {
+            RectF(it).apply {
+                left += framePadding
+                top += framePadding
+                right -= framePadding
+                bottom -= framePadding
+            }
         }
 
         setMeasuredDimension(widthMeasureSpec, heightMeasureSpec)
     }
 
     override fun onDraw(canvas: Canvas) {
-        collage.forEachIndexed { i, rect ->
-            paint.color = colors[i]
-            canvas.drawRect(rect, paint)
+        finalCollage.forEachIndexed { i, rect ->
+            collageDrawables[i]?.let { draw(canvas) } ?: canvas.drawRect(rect, paint)
         }
     }
 
     fun generateAgain(urls: List<String>) {
         this.urls = urls
-        collage = emptyList()
-        colors = emptyList()
+        originCollage = emptyList()
+        collageDrawables = arrayOfNulls(urls.size)
         requestLayout()
         invalidate()
     }
@@ -64,6 +92,8 @@ class SlashCollageView @JvmOverloads constructor(
         fun generate(n: Int, initial: Rect) = generate(n, RectF(initial))
 
         fun generate(n: Int, initial: RectF): List<RectF> {
+            if (n == 0) return emptyList()
+
             queue.clear()
             weights.clear()
 

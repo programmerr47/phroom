@@ -2,6 +2,7 @@ package com.programmerr47.phroom.sample
 
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import kotlinx.android.synthetic.main.activity_collage.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -16,6 +17,10 @@ class CollageActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_collage)
+
+        scvCollage.phroom = locator.phroom
+        scvCollage.framePadding = resources.getDimensionPixelSize(R.dimen.padding_collage_frame)
+        scvCollage.frameColor = ContextCompat.getColor(this, R.color.bgFrame)
 
         generate()
         btnGenerate.setOnClickListener { generate() }
