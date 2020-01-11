@@ -4,13 +4,13 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvList"
+    <com.programmerr47.phroom.collage.SlashCollageView
+        android:id="@+id/scvCollage"
         android:layout_width="match_parent"
         android:layout_height="match_parent"/>
 
     <Button
-        android:id="@+id/btnProceed"
+        android:id="@+id/btnGenerate"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal|bottom"

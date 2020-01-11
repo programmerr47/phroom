@@ -1,5 +1,6 @@
 package com.programmerr47.phroom.sample
 
+import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import androidx.paging.Config
@@ -16,6 +17,8 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        btnProceed.setOnClickListener { startActivity(Intent(this, CollageActivity::class.java)) }
 
         with(rvList) {
             adapter = userAdapter
