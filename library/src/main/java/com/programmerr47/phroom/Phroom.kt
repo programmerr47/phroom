@@ -26,27 +26,32 @@ import java.util.concurrent.Future
 import kotlin.math.min
 import kotlin.math.sqrt
 
-class Phroom {
+class Phroom(appContext: Context) {
     private val executor = Executors.newFixedThreadPool(5)
     private val cbExecutor = MainThreadExecutor()
     private var diskCache: BitmapCache = DUMMY_CACHE
     private var memoryCache: MemoryCache = DUMMY_MEM_CACHE
     private var thumbCache: BitmapCache = DUMMY_CACHE
 
-    private val submitted = WeakHashMap<ImageView, UrlTask>()
+    private val submitted = WeakHashMap<Target, UrlTask>()
 
-    fun load(url: String, targetView: ImageView, config: TaskConfigBuilder.() -> Unit = {}) {
-        checkCaches(targetView.context)
-        cancelWork(targetView)
+    init {
+        checkCaches(appContext.applicationContext)
+    }
 
-        val config = TaskConfigBuilder(targetView.context).apply(config)
-        val target = MainThreadTarget(ViewTarget(targetView, config), cbExecutor)
-        val task = UrlTask(url, diskCache, memoryCache, thumbCache, target)
-        submitted[targetView] = task
+    fun load(url: String, targetView: ImageView, config: TaskConfigBuilder.() -> Unit = {}) =
+        load(url, ViewTarget(targetView, TaskConfigBuilder(targetView.context).apply(config)))
+
+    fun load(url: String, target: Target) {
+        cancelWork(target)
+
+        val cvTarget = MainThreadTarget(target, cbExecutor)
+        val task = UrlTask(url, diskCache, memoryCache, thumbCache, cvTarget)
+        submitted[target] = task
         task.start(executor)
     }
 
-    private fun cancelWork(target: ImageView) {
+    private fun cancelWork(target: Target) {
         submitted.remove(target)?.end()
     }
 

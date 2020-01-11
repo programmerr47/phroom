@@ -1,7 +1,6 @@
 package com.programmerr47.phroom.sample
 
 import android.os.Bundle
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import kotlinx.android.synthetic.main.activity_collage.*
 import kotlinx.coroutines.Dispatchers
@@ -10,17 +9,19 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.random.Random
 
-class CollageActivity : AppCompatActivity() {
-    private val locator = Locator() //todo make a global locator
+class CollageActivity : LocatorActivity() {
     private val rnd = Random(System.currentTimeMillis())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_collage)
 
-        scvCollage.phroom = locator.phroom
-        scvCollage.framePadding = resources.getDimensionPixelSize(R.dimen.padding_collage_frame)
-        scvCollage.frameColor = ContextCompat.getColor(this, R.color.bgFrame)
+        with(scvCollage) {
+            phroom = locator.phroom
+            framePadding = resources.getDimensionPixelSize(R.dimen.padding_collage_frame)
+            frameColor = ContextCompat.getColor(context, R.color.bgFrame)
+            errorFrameColor = ContextCompat.getColor(context, R.color.colorAccent)
+        }
 
         generate()
         btnGenerate.setOnClickListener { generate() }

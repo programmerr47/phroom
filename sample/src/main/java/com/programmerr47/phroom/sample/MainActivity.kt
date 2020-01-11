@@ -1,7 +1,6 @@
 package com.programmerr47.phroom.sample
 
 import android.content.Intent
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import androidx.paging.Config
 import androidx.paging.PagedList
@@ -10,9 +9,8 @@ import com.programmerr47.phroom.MainThreadExecutor
 import kotlinx.android.synthetic.main.activity_main.*
 import java.util.concurrent.Executors
 
-class MainActivity : AppCompatActivity() {
-    private val locator = Locator() //todo make a global locator
-    private val userAdapter = UserAdapter(locator.phroom)
+class MainActivity : LocatorActivity() {
+    private val userAdapter by lazy { UserAdapter(locator.phroom) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

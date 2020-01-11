@@ -1,15 +1,16 @@
 package com.programmerr47.phroom.collage
 
 import android.content.Context
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.PointF
-import android.graphics.Rect
-import android.graphics.RectF
+import android.content.res.Resources
+import android.graphics.*
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.util.AttributeSet
 import android.view.View
 import com.programmerr47.phroom.Phroom
+import com.programmerr47.phroom.targets.LockTargetSize
+import com.programmerr47.phroom.targets.Target
 import kotlin.math.nextDown
 import kotlin.properties.Delegates.observable
 import kotlin.random.Random
@@ -17,13 +18,11 @@ import kotlin.random.Random
 class SlashCollageView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-
     private var originCollage: List<RectF> = emptyList()
     private var finalCollage: List<RectF> = emptyList()
 
     private var urls: List<String> = emptyList()
-    private var collageDrawables: Array<Drawable?> = emptyArray()
+    private var collageTargets: Array<CollageTarget> = emptyArray()
 
     lateinit var phroom: Phroom
 
@@ -34,12 +33,9 @@ class SlashCollageView @JvmOverloads constructor(
         }
     }
 
-    var frameColor: Int by observable(0) { _, old, new ->
-        if (old != new) {
-            paint.color = new
-            invalidate()
-        }
-    }
+    //TODO add invalidate, because right now you have to change them before Targets will be built
+    var frameColor: Int = 0
+    var errorFrameColor: Int = 0
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val widthNotUnspecified = MeasureSpec.getMode(widthMeasureSpec) != MeasureSpec.UNSPECIFIED
@@ -62,21 +58,27 @@ class SlashCollageView @JvmOverloads constructor(
             }
         }
 
+        collageTargets.forEachIndexed { i, target -> target.onMeasured(finalCollage[i]) }
+
         setMeasuredDimension(widthMeasureSpec, heightMeasureSpec)
     }
 
     override fun onDraw(canvas: Canvas) {
         finalCollage.forEachIndexed { i, rect ->
-            collageDrawables[i]?.let { draw(canvas) } ?: canvas.drawRect(rect, paint)
+            collageTargets[i].drawable.draw(canvas)
         }
     }
 
     fun generateAgain(urls: List<String>) {
         this.urls = urls
         originCollage = emptyList()
-        collageDrawables = arrayOfNulls(urls.size)
+        collageTargets = Array(urls.size) { CollageTarget(frameColor, errorFrameColor, { invalidate() }, resources) }
         requestLayout()
         invalidate()
+
+        urls.forEachIndexed { i, url ->
+            phroom.load(url, collageTargets[i])
+        }
     }
 
     private fun generateCollage(width: Int, height: Int): List<RectF> = Generator.generate(
@@ -193,6 +195,70 @@ class SlashCollageView @JvmOverloads constructor(
                 from + nextFloat() * size
             }
             return if (r >= until) until.nextDown() else r
+        }
+    }
+
+    private class CollageTarget(
+        frameColor: Int,
+        private val errorFrameColor: Int,
+        private val invalidate: () -> Unit,
+        private val resources: Resources
+    ) : Target {
+        var drawable: Drawable = ColorDrawable(frameColor)
+            private set(value) {
+                field = value
+                applyMeasurement()
+                invalidate()
+            }
+
+        private var sizeRect: RectF = RectF(0f, 0f, 0f, 0f)
+
+        override val size = Size()
+
+        override fun onNew(initial: Bitmap?) {
+            if (initial != null) {
+                drawable = BitmapDrawable(resources, initial)
+            }
+        }
+
+        override fun onStart() {}
+
+        override fun onSuccess(bitmap: Bitmap) {
+            drawable = BitmapDrawable(resources, bitmap)
+        }
+
+        override fun onFailure(e: Throwable) {
+            drawable = ColorDrawable(errorFrameColor)
+        }
+
+        fun onMeasured(rect: RectF) {
+            sizeRect = rect
+            applyMeasurement()
+            size.onMeasured(rect)
+        }
+
+        private fun applyMeasurement() {
+            drawable.setBounds(sizeRect.left.toInt(), sizeRect.top.toInt(), sizeRect.right.toInt(), sizeRect.bottom.toInt())
+        }
+
+        private class Size : LockTargetSize() {
+
+            @Volatile
+            private var sizeRect: RectF = RectF(0f, 0f, 0f, 0f)
+
+            override val width: Int get() = await { sizeRect.width().toInt() }
+
+            override val height: Int get() = await { sizeRect.height().toInt() }
+
+            init {
+                startWait()
+            }
+
+            override fun check() = sizeRect.width().toInt() to sizeRect.height().toInt()
+
+            fun onMeasured(rect: RectF) {
+                signal { sizeRect = rect }
+            }
         }
     }
 }
