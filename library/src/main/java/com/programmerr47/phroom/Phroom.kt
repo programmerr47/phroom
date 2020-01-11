@@ -15,7 +15,6 @@ import com.programmerr47.phroom.targets.LogTarget
 import com.programmerr47.phroom.targets.MainThreadTarget
 import com.programmerr47.phroom.targets.Target
 import com.programmerr47.phroom.targets.ViewTarget
-import java.io.BufferedInputStream
 import java.io.File
 import java.io.InputStream
 import java.net.URL
@@ -23,6 +22,7 @@ import java.util.WeakHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
+import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
 
@@ -151,7 +151,7 @@ private class UrlTask(
     @WorkerThread
     private fun fetchUrl(spec: BitmapSpec) {
         runCatching {
-            diskCache.get(spec.url) ?: BitmapFactory.decodeStream(BufferedInputStream(URL(spec.url).content as InputStream)).also {
+            diskCache.get(spec.url) ?: BitmapFactory.decodeStream(URL(spec.url).content as InputStream).also {
                 diskCache.put(spec.url, it)
             }
         }
@@ -176,13 +176,14 @@ private class UrlTask(
     }
 
     @WorkerThread
+    //pick a scale factor with preserving the aspect ratio
     private fun scaleFactor(bitmap: Bitmap, spec: BitmapSpec): Float {
         if (bitmap.width <= spec.tWidth || bitmap.height <= spec.tHeight) return 1f
 
-        return min(
+        return min(1f, max(
             spec.tWidth.toFloat() / bitmap.width,
             spec.tHeight.toFloat() / bitmap.height
-        )
+        ))
     }
 
     @WorkerThread
