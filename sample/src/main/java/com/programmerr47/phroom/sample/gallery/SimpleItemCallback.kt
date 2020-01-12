@@ -1,4 +1,4 @@
-package com.programmerr47.phroom.sample
+package com.programmerr47.phroom.sample.gallery
 
 import androidx.recyclerview.widget.DiffUtil
 

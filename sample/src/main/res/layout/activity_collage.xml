@@ -15,6 +15,6 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal|bottom"
         android:layout_marginBottom="32dp"
-        android:text="GENERATE"/>
+        android:text="Generate New"/>
 
 </FrameLayout>

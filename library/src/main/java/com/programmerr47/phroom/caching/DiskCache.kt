@@ -2,6 +2,8 @@ package com.programmerr47.phroom.caching
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import com.programmerr47.phroom.kutils.createSafe
+import com.programmerr47.phroom.kutils.deleteSafe
 import java.io.File
 import java.io.FileInputStream
 import java.security.MessageDigest
@@ -49,12 +51,6 @@ internal class DiskCache(
 
     private fun ByteArray.toHex() = joinToString("") { "%02x".format(it) }
 
-    private fun File.createSafe() = safeBoolean { createNewFile() }
-    private fun File.deleteSafe() = safeBoolean { delete() }
-
     private fun File.writePng(bitmap: Bitmap) =
         outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 0, it) }
-
-    private inline fun safeBoolean(operation: () -> Boolean) =
-        runCatching(operation).fold({ it }, { false })
 }

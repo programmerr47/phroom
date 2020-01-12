@@ -1,9 +1,10 @@
-package com.programmerr47.phroom.sample
+package com.programmerr47.phroom.sample.di
 
 import android.content.Context
 import com.google.gson.Gson
-import com.google.gson.JsonDeserializationContext
 import com.programmerr47.phroom.Phroom
+import com.programmerr47.phroom.sample.Api
+import com.programmerr47.phroom.sample.BuildConfig
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor

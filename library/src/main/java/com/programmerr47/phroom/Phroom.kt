@@ -11,6 +11,8 @@ import com.programmerr47.phroom.caching.DiskCache
 import com.programmerr47.phroom.caching.LruMemoryCache
 import com.programmerr47.phroom.caching.MemoryCache
 import com.programmerr47.phroom.caching.ThumbnailsCache
+import com.programmerr47.phroom.kutils.divEach
+import com.programmerr47.phroom.kutils.sumEach
 import com.programmerr47.phroom.targets.LogTarget
 import com.programmerr47.phroom.targets.MainThreadTarget
 import com.programmerr47.phroom.targets.Target
@@ -26,6 +28,8 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
 
+//TODO add support of center crop
+//TODO add global config
 class Phroom(appContext: Context) {
     private val executor = Executors.newFixedThreadPool(5)
     private val cbExecutor = MainThreadExecutor()
@@ -42,6 +46,7 @@ class Phroom(appContext: Context) {
     fun load(url: String, targetView: ImageView, config: TaskConfigBuilder.() -> Unit = {}) =
         load(url, ViewTarget(targetView, TaskConfigBuilder(targetView.context).apply(config)))
 
+    //TODO add common TaskConfigBuilder with scaleType or custom transformers, that fits all target, not only ViewTarget
     fun load(url: String, target: Target) {
         cancelWork(target)
 
@@ -165,7 +170,6 @@ private class UrlTask(
             .onFailure { target?.onFailure(it) }
     }
 
-    @WorkerThread
     private fun transform(bitmap: Bitmap, spec: BitmapSpec): Bitmap {
         val scaleFactor = scaleFactor(bitmap, spec)
         if (scaleFactor == 1f) return bitmap
@@ -175,7 +179,6 @@ private class UrlTask(
         return transformed
     }
 
-    @WorkerThread
     //pick a scale factor with preserving the aspect ratio
     private fun scaleFactor(bitmap: Bitmap, spec: BitmapSpec): Float {
         if (bitmap.width <= spec.tWidth || bitmap.height <= spec.tHeight) return 1f
@@ -186,20 +189,17 @@ private class UrlTask(
         ))
     }
 
-    @WorkerThread
     private fun Bitmap.thumbnail(): Bitmap {
         //target area is 40 pixels which equals to 6x6 bitmap or 5x8 etc
         val scaleFactor = sqrt(height.toFloat() * 40 / width) / height
         return scaledCopy(scaleFactor).apply { blur() }
     }
 
-    @WorkerThread
     private fun Bitmap.scaledCopy(scaleFactor: Float): Bitmap {
         val matrix = Matrix().apply { postScale(scaleFactor, scaleFactor) }
         return Bitmap.createBitmap(this, 0, 0, width, height, matrix, true)
     }
 
-    @WorkerThread
     private fun Bitmap.blur() {
         val pix = IntArray(width * height)
         val newPix = IntArray(width * height)
@@ -239,19 +239,6 @@ private class UrlTask(
         }
 
         rgbSum.divEach(count)
-    }
-
-    private fun IntArray.sumEach(other: IntArray) {
-        require(size == other.size)
-        for (i in 0 until size) {
-            this[i] += other[i]
-        }
-    }
-
-    private fun IntArray.divEach(count: Int) {
-        for (i in 0 until size) {
-            this[i] /= count
-        }
     }
 
     private fun Int.spreadOutColor(rgb: IntArray) {

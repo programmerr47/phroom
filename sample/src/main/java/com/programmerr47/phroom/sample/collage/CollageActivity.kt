@@ -1,7 +1,9 @@
-package com.programmerr47.phroom.sample
+package com.programmerr47.phroom.sample.collage
 
 import android.os.Bundle
 import androidx.core.content.ContextCompat
+import com.programmerr47.phroom.sample.R
+import com.programmerr47.phroom.sample.di.LocatorActivity
 import kotlinx.android.synthetic.main.activity_collage.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -31,7 +33,7 @@ class CollageActivity : LocatorActivity() {
         GlobalScope.launch(Dispatchers.Main) {
             btnGenerate.isEnabled = false
 
-            val users = withContext(Dispatchers.IO) { locator.api.getUsers(rnd.nextInt(5, 40)) }
+            val users = withContext(Dispatchers.IO) { locator.api.getUsers(rnd.nextInt(5, 50)) }
             scvCollage.generateAgain(users.results.map { it.picture.large })
 
             btnGenerate.isEnabled = true

@@ -2,23 +2,35 @@ package com.programmerr47.phroom.collage
 
 import android.content.Context
 import android.content.res.Resources
-import android.graphics.*
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.PointF
+import android.graphics.Rect
+import android.graphics.RectF
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.util.AttributeSet
 import android.view.View
 import com.programmerr47.phroom.Phroom
+import com.programmerr47.phroom.kutils.area
+import com.programmerr47.phroom.kutils.nextFloat
 import com.programmerr47.phroom.targets.LockTargetSize
 import com.programmerr47.phroom.targets.Target
+import kotlin.math.max
 import kotlin.math.nextDown
+import kotlin.math.pow
 import kotlin.properties.Delegates.observable
 import kotlin.random.Random
 
 class SlashCollageView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
-    private var originCollage: List<RectF> = emptyList()
+    private val generator = Generator()
+
+    private var originCollage: List<RectF> by observable(emptyList()) { _, _, new ->
+        invalidateFinalCollage(new)
+    }
     private var finalCollage: List<RectF> = emptyList()
 
     private var urls: List<String> = emptyList()
@@ -28,8 +40,7 @@ class SlashCollageView @JvmOverloads constructor(
 
     var framePadding: Int by observable(0) { _, old, new ->
         if (old != new) {
-            requestLayout()
-            invalidate()
+            invalidateFinalCollage(originCollage)
         }
     }
 
@@ -41,24 +52,12 @@ class SlashCollageView @JvmOverloads constructor(
         val widthNotUnspecified = MeasureSpec.getMode(widthMeasureSpec) != MeasureSpec.UNSPECIFIED
         val heightNotUnspecified = MeasureSpec.getMode(heightMeasureSpec) != MeasureSpec.UNSPECIFIED
 
-        //TODO move that
-        if (widthNotUnspecified && heightNotUnspecified && originCollage.isEmpty()) {
+        if (widthNotUnspecified && heightNotUnspecified && originCollage.isEmpty() && !urls.isEmpty()) {
             originCollage = generateCollage(
                 MeasureSpec.getSize(widthMeasureSpec),
                 MeasureSpec.getSize(heightMeasureSpec)
             )
         }
-
-        finalCollage = originCollage.map {
-            RectF(it).apply {
-                left += framePadding
-                top += framePadding
-                right -= framePadding
-                bottom -= framePadding
-            }
-        }
-
-        collageTargets.forEachIndexed { i, target -> target.onMeasured(finalCollage[i]) }
 
         setMeasuredDimension(widthMeasureSpec, heightMeasureSpec)
     }
@@ -71,9 +70,16 @@ class SlashCollageView @JvmOverloads constructor(
 
     fun generateAgain(urls: List<String>) {
         this.urls = urls
-        originCollage = emptyList()
-        collageTargets = Array(urls.size) { CollageTarget(frameColor, errorFrameColor, { invalidate() }, resources) }
-        requestLayout()
+        collageTargets = Array(urls.size) {
+            CollageTarget(
+                frameColor,
+                errorFrameColor,
+                { invalidate() },
+                resources
+            )
+        }
+        originCollage = generateCollage(measuredWidth, measuredHeight)
+
         invalidate()
 
         urls.forEachIndexed { i, url ->
@@ -81,14 +87,34 @@ class SlashCollageView @JvmOverloads constructor(
         }
     }
 
-    private fun generateCollage(width: Int, height: Int): List<RectF> = Generator.generate(
-        urls.size, Rect(paddingStart, paddingTop, width - paddingEnd, height - paddingEnd)
-    )
+    private fun generateCollage(width: Int, height: Int): List<RectF> {
+        if (width > 0 && height > 0) {
+            return generator.generate(
+                urls.size, Rect(paddingStart, paddingTop, width - paddingEnd, height - paddingEnd)
+            )
+        } else {
+            return emptyList()
+        }
+    }
 
-    private object Generator {
+    private fun invalidateFinalCollage(originCollage: List<RectF>) {
+        finalCollage = originCollage.map {
+            RectF(it).apply {
+                left += framePadding
+                top += framePadding
+                right -= framePadding
+                bottom -= framePadding
+            }
+        }
+
+        collageTargets.forEachIndexed { i, target -> target.onMeasured(finalCollage[i]) }
+        invalidate()
+    }
+
+    private class Generator {
         private val rnd = Random(System.currentTimeMillis())
         private val queue = ArrayList<RectF>(20)
-        private val weights = ArrayList<Int>(20)
+        private val weights = ArrayList<Float>(20)
         private val splitPoint = PointF()
 
         fun generate(n: Int, initial: Rect) = generate(n, RectF(initial))
@@ -103,15 +129,15 @@ class SlashCollageView @JvmOverloads constructor(
             weights.ensureCapacity(n)
 
             queue.add(initial)
-            weights.add(1)
+            weights.add(initial.weight)
 
-            var sum = 1
+            var sum = initial.weight
             while (queue.size < n) {
-                val choice = rnd.nextInt(sum)
+                val choice = rnd.nextFloat(sum)
                 val index = findIndex(choice, weights)
 
                 val rectToSplit = queue.removeAt(index)
-                weights.removeAt(index)
+                val removedWeight = weights.removeAt(index)
                 findSplitPoint(rectToSplit, splitPoint)
 
                 val newRect = if (splitPoint.x == 0f) { //means we will cut horizontally
@@ -120,23 +146,21 @@ class SlashCollageView @JvmOverloads constructor(
                     cutVertically(rectToSplit, splitPoint.x)
                 }
 
-                weights.indices.forEach { i ->
-                    weights[i] += 1
-                }
-
                 queue.add(rectToSplit)
                 queue.add(newRect)
-                weights.add(1)
-                weights.add(1)
+                val rectToSplitWeight = rectToSplit.weight
+                val newRectWeight = newRect.weight
+                weights.add(rectToSplitWeight)
+                weights.add(newRectWeight)
 
-                sum += weights.size
+                sum += rectToSplitWeight + newRectWeight - removedWeight
             }
 
             return queue
         }
 
-        private fun findIndex(choice: Int, weights: List<Int>): Int {
-            var controlSum = 0
+        private fun findIndex(choice: Float, weights: List<Float>): Int {
+            var controlSum = 0f
             weights.forEachIndexed { i, weight ->
                 controlSum += weight
 
@@ -150,7 +174,7 @@ class SlashCollageView @JvmOverloads constructor(
 
         private fun findSplitPoint(rect: RectF, out: PointF) {
             val until = (rect.height() + rect.width()) * 2
-            val choice = rnd.nextFloat(0f, until)
+            val choice = rnd.nextFloat(until)
 
             if (choice < 2 * rect.height()) { //means that choice lies on left side
                 out.x = 0f
@@ -183,23 +207,14 @@ class SlashCollageView @JvmOverloads constructor(
             return rightRect
         }
 
-        //Copied from Random.nextDouble(from: Float, until: Float) method
-        //and adapted to floats, because there is no appropriate method :(
-        private fun Random.nextFloat(from: Float, until: Float): Float {
-            require(until > from)
-            val size = until - from
-            val r = if (size.isInfinite() && from.isFinite() && until.isFinite()) {
-                val r1 = nextFloat() * (until / 2 - from / 2)
-                from + r1 + r1
-            } else {
-                from + nextFloat() * size
-            }
-            return if (r >= until) until.nextDown() else r
-        }
+        //Special formula to help random build more pretty collages
+        private val RectF.weight get() = area.pow(0.5f) * maxRatio.pow(2)
+
+        private val RectF.maxRatio get() = max(width() / height(), height() / width())
     }
 
     private class CollageTarget(
-        frameColor: Int,
+        private val frameColor: Int,
         private val errorFrameColor: Int,
         private val invalidate: () -> Unit,
         private val resources: Resources
@@ -218,6 +233,8 @@ class SlashCollageView @JvmOverloads constructor(
         override fun onNew(initial: Bitmap?) {
             if (initial != null) {
                 drawable = BitmapDrawable(resources, initial)
+            } else {
+                drawable = ColorDrawable(frameColor)
             }
         }
 

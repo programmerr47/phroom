@@ -1,4 +1,4 @@
-package com.programmerr47.phroom.sample
+package com.programmerr47.phroom.sample.gallery
 
 import android.content.Intent
 import android.os.Bundle
@@ -6,10 +6,13 @@ import androidx.paging.Config
 import androidx.paging.PagedList
 import androidx.recyclerview.widget.GridLayoutManager
 import com.programmerr47.phroom.MainThreadExecutor
+import com.programmerr47.phroom.sample.collage.CollageActivity
+import com.programmerr47.phroom.sample.di.LocatorActivity
+import com.programmerr47.phroom.sample.R
 import kotlinx.android.synthetic.main.activity_main.*
 import java.util.concurrent.Executors
 
-class MainActivity : LocatorActivity() {
+class GalleryActivity : LocatorActivity() {
     private val userAdapter by lazy { UserAdapter(locator.phroom) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
