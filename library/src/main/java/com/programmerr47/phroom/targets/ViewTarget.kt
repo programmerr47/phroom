@@ -26,43 +26,33 @@ internal class ViewTarget(
     override fun onFailure(e: Throwable) =
         imageView.setImageDrawable(configBuilder.errorPlaceholder)
 
+    override fun equals(other: Any?): Boolean {
+        if (other === this) return true
+        if (other !is ViewTarget) return false
+
+        return imageView == other.imageView
+    }
+
+    override fun hashCode() = imageView.hashCode()
+
     private class ViewSize(
         private val view: View
-    ) : Target.Size {
-
-        private val _lock = ReentrantLock()
-        private val _cond = _lock.newCondition()
-        private var awaitForSize = false //wanted to do AtomicBoolean, but realised that we use it only inside lock section, so it is not needed
+    ) : LockTargetSize() {
 
         @Volatile
         private var size: Pair<Int, Int> = view.size()
 
-        override val width: Int
-            get() = _lock.withLock {
-                if (awaitForSize) _cond.await()
-                size.first
-            }
+        override val width: Int get() = await { size.first }
 
-        override val height: Int
-            get() = _lock.withLock {
-                if (awaitForSize) _cond.await()
-                size.second
-            }
+        override val height: Int get() = await { size.second }
 
         init {
             if (view.measuredWidth == 0 && view.measuredHeight == 0) {
-                awaitForSize = true
+                startWait()
                 view.viewTreeObserver.addOnPreDrawListener(object : ViewTreeObserver.OnPreDrawListener {
                     override fun onPreDraw(): Boolean {
                         view.viewTreeObserver.removeOnPreDrawListener(this)
-                        _lock.withLock {
-                            size = view.size()
-
-                            if (awaitForSize) {
-                                awaitForSize = false
-                                _cond.signalAll()
-                            }
-                        }
+                        signal { size = view.size() }
                         return true
                     }
                 })

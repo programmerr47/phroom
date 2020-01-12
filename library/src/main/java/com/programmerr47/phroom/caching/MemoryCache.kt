@@ -74,7 +74,7 @@ internal class LruMemoryCache(
                 //thing is overkill right now
                 return lru[it] to false
             } else {
-                if (it.url in originMap) {
+                if (originMap[it.url] == it) {
                     return lru[it] to false
                 }
 

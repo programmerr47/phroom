@@ -1,6 +1,7 @@
-package com.programmerr47.phroom.sample
+package com.programmerr47.phroom.sample.gallery
 
 import androidx.paging.ItemKeyedDataSource
+import com.programmerr47.phroom.sample.Api
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch

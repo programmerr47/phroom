@@ -11,11 +11,12 @@ import com.programmerr47.phroom.caching.DiskCache
 import com.programmerr47.phroom.caching.LruMemoryCache
 import com.programmerr47.phroom.caching.MemoryCache
 import com.programmerr47.phroom.caching.ThumbnailsCache
+import com.programmerr47.phroom.kutils.divEach
+import com.programmerr47.phroom.kutils.sumEach
 import com.programmerr47.phroom.targets.LogTarget
 import com.programmerr47.phroom.targets.MainThreadTarget
 import com.programmerr47.phroom.targets.Target
 import com.programmerr47.phroom.targets.ViewTarget
-import java.io.BufferedInputStream
 import java.io.File
 import java.io.InputStream
 import java.net.URL
@@ -23,30 +24,39 @@ import java.util.WeakHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
+import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
 
-class Phroom {
+//TODO add support of center crop
+//TODO add global config
+class Phroom(appContext: Context) {
     private val executor = Executors.newFixedThreadPool(5)
     private val cbExecutor = MainThreadExecutor()
     private var diskCache: BitmapCache = DUMMY_CACHE
     private var memoryCache: MemoryCache = DUMMY_MEM_CACHE
     private var thumbCache: BitmapCache = DUMMY_CACHE
 
-    private val submitted = WeakHashMap<ImageView, UrlTask>()
+    private val submitted = WeakHashMap<Target, UrlTask>()
 
-    fun load(url: String, targetView: ImageView, config: TaskConfigBuilder.() -> Unit = {}) {
-        checkCaches(targetView.context)
-        cancelWork(targetView)
+    init {
+        checkCaches(appContext.applicationContext)
+    }
 
-        val config = TaskConfigBuilder(targetView.context).apply(config)
-        val target = MainThreadTarget(ViewTarget(targetView, config), cbExecutor)
-        val task = UrlTask(url, diskCache, memoryCache, thumbCache, target)
-        submitted[targetView] = task
+    fun load(url: String, targetView: ImageView, config: TaskConfigBuilder.() -> Unit = {}) =
+        load(url, ViewTarget(targetView, TaskConfigBuilder(targetView.context).apply(config)))
+
+    //TODO add common TaskConfigBuilder with scaleType or custom transformers, that fits all target, not only ViewTarget
+    fun load(url: String, target: Target) {
+        cancelWork(target)
+
+        val cvTarget = MainThreadTarget(target, cbExecutor)
+        val task = UrlTask(url, diskCache, memoryCache, thumbCache, cvTarget)
+        submitted[target] = task
         task.start(executor)
     }
 
-    private fun cancelWork(target: ImageView) {
+    private fun cancelWork(target: Target) {
         submitted.remove(target)?.end()
     }
 
@@ -146,7 +156,7 @@ private class UrlTask(
     @WorkerThread
     private fun fetchUrl(spec: BitmapSpec) {
         runCatching {
-            diskCache.get(spec.url) ?: BitmapFactory.decodeStream(BufferedInputStream(URL(spec.url).content as InputStream)).also {
+            diskCache.get(spec.url) ?: BitmapFactory.decodeStream(URL(spec.url).content as InputStream).also {
                 diskCache.put(spec.url, it)
             }
         }
@@ -160,7 +170,6 @@ private class UrlTask(
             .onFailure { target?.onFailure(it) }
     }
 
-    @WorkerThread
     private fun transform(bitmap: Bitmap, spec: BitmapSpec): Bitmap {
         val scaleFactor = scaleFactor(bitmap, spec)
         if (scaleFactor == 1f) return bitmap
@@ -170,30 +179,27 @@ private class UrlTask(
         return transformed
     }
 
-    @WorkerThread
+    //pick a scale factor with preserving the aspect ratio
     private fun scaleFactor(bitmap: Bitmap, spec: BitmapSpec): Float {
         if (bitmap.width <= spec.tWidth || bitmap.height <= spec.tHeight) return 1f
 
-        return min(
+        return min(1f, max(
             spec.tWidth.toFloat() / bitmap.width,
             spec.tHeight.toFloat() / bitmap.height
-        )
+        ))
     }
 
-    @WorkerThread
     private fun Bitmap.thumbnail(): Bitmap {
         //target area is 40 pixels which equals to 6x6 bitmap or 5x8 etc
         val scaleFactor = sqrt(height.toFloat() * 40 / width) / height
         return scaledCopy(scaleFactor).apply { blur() }
     }
 
-    @WorkerThread
     private fun Bitmap.scaledCopy(scaleFactor: Float): Bitmap {
         val matrix = Matrix().apply { postScale(scaleFactor, scaleFactor) }
         return Bitmap.createBitmap(this, 0, 0, width, height, matrix, true)
     }
 
-    @WorkerThread
     private fun Bitmap.blur() {
         val pix = IntArray(width * height)
         val newPix = IntArray(width * height)
@@ -233,19 +239,6 @@ private class UrlTask(
         }
 
         rgbSum.divEach(count)
-    }
-
-    private fun IntArray.sumEach(other: IntArray) {
-        require(size == other.size)
-        for (i in 0 until size) {
-            this[i] += other[i]
-        }
-    }
-
-    private fun IntArray.divEach(count: Int) {
-        for (i in 0 until size) {
-            this[i] /= count
-        }
     }
 
     private fun Int.spreadOutColor(rgb: IntArray) {

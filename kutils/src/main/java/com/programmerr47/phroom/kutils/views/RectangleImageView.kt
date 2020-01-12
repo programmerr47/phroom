@@ -1,4 +1,4 @@
-package com.programmerr47.phroom.sample
+package com.programmerr47.phroom.kutils.views
 
 import android.content.Context
 import android.util.AttributeSet

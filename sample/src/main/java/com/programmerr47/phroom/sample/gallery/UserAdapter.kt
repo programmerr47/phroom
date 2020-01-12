@@ -1,10 +1,12 @@
-package com.programmerr47.phroom.sample
+package com.programmerr47.phroom.sample.gallery
 
 import android.view.ViewGroup
 import android.widget.ImageView
 import androidx.paging.PagedListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.programmerr47.phroom.Phroom
+import com.programmerr47.phroom.sample.R
+import com.programmerr47.phroom.kutils.views.SquareImageView
 
 class UserAdapter(
     private val phroom: Phroom

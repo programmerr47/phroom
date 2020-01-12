@@ -1,7 +1,10 @@
-package com.programmerr47.phroom.sample
+package com.programmerr47.phroom.sample.di
 
+import android.content.Context
 import com.google.gson.Gson
 import com.programmerr47.phroom.Phroom
+import com.programmerr47.phroom.sample.Api
+import com.programmerr47.phroom.sample.BuildConfig
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -9,8 +12,8 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.create
 
-class Locator {
-    val phroom: Phroom by lazy { Phroom() }
+class Locator(val appContext: Context) {
+    val phroom: Phroom by lazy { Phroom(appContext.applicationContext) }
 
     val api: Api by lazy { retrofit.create<Api>() }
 
