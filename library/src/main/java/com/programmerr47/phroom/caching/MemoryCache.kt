@@ -21,7 +21,6 @@ internal class LruMemoryCache(
             with(value) { if (atLeastKitkat()) allocationByteCount else byteCount }
 
         override fun entryRemoved(evicted: Boolean, key: BitmapSpec, oldValue: Bitmap, newValue: Bitmap?) {
-            super.entryRemoved(evicted, key, oldValue, newValue)
             specMap[key.url]?.remove(key)
 
             if (originMap[key.url] == key) {

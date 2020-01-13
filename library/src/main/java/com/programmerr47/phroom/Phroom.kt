@@ -80,7 +80,10 @@ class Phroom(appContext: Context) {
     private fun diskCache(context: Context): DiskCache {
         val cacheDir = with(context.applicationContext) { externalCacheDir ?: cacheDir }
         val phroomDir = File(cacheDir, CACHE_DIR_NAME)
-        return DiskCache(if (phroomDir.mkdir()) phroomDir else cacheDir)
+        return DiskCache(
+            cacheDir = if ((phroomDir.exists() && phroomDir.isDirectory) || phroomDir.mkdir()) phroomDir else cacheDir,
+            maxBytesCount = 100 * 1024 * 1024 //100MB
+        )
     }
 
     companion object {
