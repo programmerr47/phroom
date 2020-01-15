@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
+import android.util.Log
 import android.widget.ImageView
 import androidx.annotation.WorkerThread
 import com.programmerr47.phroom.caching.BitmapCache
@@ -48,7 +49,7 @@ class Phroom(appContext: Context) {
 
     //TODO add common TaskConfigBuilder with scaleType or custom transformers, that fits all target, not only ViewTarget
     fun load(url: String, target: Target) {
-        cancelWork(target)
+        cancel(target)
 
         val cvTarget = MainThreadTarget(target, cbExecutor)
         val task = UrlTask(url, diskCache, memoryCache, thumbCache, cvTarget)
@@ -56,7 +57,7 @@ class Phroom(appContext: Context) {
         task.start(executor)
     }
 
-    private fun cancelWork(target: Target) {
+    fun cancel(target: Target) {
         submitted.remove(target)?.end()
     }
 
@@ -92,6 +93,7 @@ class Phroom(appContext: Context) {
         private val DUMMY_CACHE = object : BitmapCache {
             override fun get(key: String): Bitmap? = null
             override fun put(key: String, bitmap: Bitmap) = Unit
+            override fun remove(key: String) {}
         }
 
         private val DUMMY_MEM_CACHE = object : MemoryCache {
@@ -159,8 +161,10 @@ private class UrlTask(
     @WorkerThread
     private fun fetchUrl(spec: BitmapSpec) {
         runCatching {
-            diskCache.get(spec.url) ?: BitmapFactory.decodeStream(URL(spec.url).content as InputStream).also {
-                diskCache.put(spec.url, it)
+            diskCache.get(spec.url) ?: URL(spec.url).openStream().use {
+                BitmapFactory.decodeStream(it).also {
+                    diskCache.put(spec.url, it)
+                }
             }
         }
             .onSuccess {
@@ -170,7 +174,10 @@ private class UrlTask(
                 thumbCache.put(spec.url, thumbnail)
                 target?.onSuccess(transformed)
             }
-            .onFailure { target?.onFailure(it) }
+            .onFailure {
+                diskCache.remove(spec.url)
+                target?.onFailure(it)
+            }
     }
 
     private fun transform(bitmap: Bitmap, spec: BitmapSpec): Bitmap {
@@ -252,6 +259,26 @@ private class UrlTask(
 
     fun end() {
         target = null
-        inner?.cancel(true)
+
+        //Previously there was true as an argument instead of false. But it leads us to image
+        //tearing for somehow. Unfortunately, I didn't figure out what to do exactly, but
+        //the problem is next. Bitmap.decodeStream throws InterruptedException, is thread
+        //will be interrupted while image will be loading from url, so everything is fine here
+        //since we will catch this exception and stop our work.
+        //BUT! Bitmap.compress (inside DiskCache class) does not throw it, so we will catch nothing
+        //That lead us to threads, that are stopping, while image is saving to file, and this
+        //image saves partially. So we could just call Thread.interrupted() after that.
+        //BUT!!! most interesting part is that this method returns false for such images, which
+        //means that thread is not interrupted for us. This can mean one of two things:
+        //1) Thread was not interrupted and the problem is in different thing (but I suppose it's not)
+        //2) Someone called Thread.interrupted() inside Bitmap.compress and swallowed it
+        //(or handled), which means that other Thread.interrupted() or Thread.currentThread().isInterrupted
+        //will always return false (because of specificity of that method)
+        //Because I didn't find other solutions, we just set here flag to false, to allow threads,
+        //that already started to no be interrupting (which is less performance for us,
+        //but more stability). And actually, that problem can still be here is the application
+        //will be quit in a way, that those threads will be immediately closed (which is really
+        //really rare case, but still)
+        inner?.cancel(false)
     }
 }

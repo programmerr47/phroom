@@ -19,20 +19,20 @@ internal class LogTarget(private val origin: Target) : Target by origin {
     }
 
     override fun onSuccess(bitmap: Bitmap) {
-        logTime(true)
+        logTime(Result.success(bitmap))
         origin.onSuccess(bitmap)
     }
 
     override fun onFailure(e: Throwable) {
-        logTime(false)
+        logTime(Result.failure(e))
         origin.onFailure(e)
     }
 
-    private fun logTime(success: Boolean) {
+    private fun logTime(result: Result<Bitmap>) {
         val end = System.nanoTime()
         val lifeTime = (end - initialNs).toMillis()
         val loadTime = (end - startNs).toMillis()
-        logInternal("[$lifeTime ms | $loadTime ms] $origin is finished with ${if (success) "SUCCESS" else "FAIL"}")
+        logInternal("[$lifeTime ms | $loadTime ms] $origin is finished with ${if (result.isSuccess) "SUCCESS" else "FAIL (reason ${result.exceptionOrNull()})"}")
     }
 
     private fun Long.toMillis() = this / 1_000_000

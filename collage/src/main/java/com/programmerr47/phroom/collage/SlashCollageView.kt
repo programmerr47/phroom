@@ -18,7 +18,6 @@ import com.programmerr47.phroom.kutils.nextFloat
 import com.programmerr47.phroom.targets.LockTargetSize
 import com.programmerr47.phroom.targets.Target
 import kotlin.math.max
-import kotlin.math.nextDown
 import kotlin.math.pow
 import kotlin.properties.Delegates.observable
 import kotlin.random.Random
@@ -34,7 +33,9 @@ class SlashCollageView @JvmOverloads constructor(
     private var finalCollage: List<RectF> = emptyList()
 
     private var urls: List<String> = emptyList()
-    private var collageTargets: Array<CollageTarget> = emptyArray()
+    private var collageTargets: Array<CollageTarget> by observable(emptyArray()) { _, old, _ ->
+        old.forEach { phroom.cancel(it) }
+    }
 
     lateinit var phroom: Phroom
 

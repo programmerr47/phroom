@@ -2,6 +2,7 @@ package com.programmerr47.phroom.caching
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.util.Log
 import androidx.collection.LruCache
 import com.programmerr47.phroom.atLeastKitkat
 import com.programmerr47.phroom.kutils.createSafe
@@ -52,6 +53,8 @@ internal class DiskCache(
         saveJournal()
     }
 
+    override fun remove(key: String): Unit = _lock.write { tryToRemove(key) }
+
     private fun tryToRemove(key: String) {
         getFile(key)?.deleteSafe()
         records.remove(key)
@@ -100,7 +103,7 @@ internal class DiskCache(
     private fun ByteArray.toHex() = joinToString("") { "%02x".format(it) }
 
     private fun File.writePng(bitmap: Bitmap) =
-        outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 0, it) }
+        outputStream().buffered().use { bitmap.compress(Bitmap.CompressFormat.PNG, 0, it) }
 
     private class Record(
         val name: String,
