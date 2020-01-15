@@ -20,4 +20,6 @@ class ThumbnailsCache(
     override fun get(key: String): Bitmap? = _lock.read { lru.get(key) }
 
     override fun put(key: String, bitmap: Bitmap): Unit = _lock.write { lru.put(key, bitmap) }
+
+    override fun remove(key: String): Unit = _lock.write { lru.remove(key) }
 }
